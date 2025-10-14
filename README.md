@@ -1,30 +1,96 @@
-# Trading Bot EURUSD - FTMO rules (skeleton)
+# Next-to-me Trading Bot
 
-Projeto skeleton para bot de trading que opera externamente via MetaTrader5 Python API.
+## 1. Purpose
 
-Estrutura de módulos:
-- main.py: orquestrador principal (modo dryrun/backtest vs live)
-- mt5_connector.py: inicializa MT5, envia ordens, consulta posições
-- risk_engine.py: cálculo de MDL, MAXLOSS, sizing (1% por trade)
-- order_manager.py: cria/fecha/modify ordens e trailing ATR
-- signals.py: detectores price-action (placeholder, implementar regras)
-- utils.py: funções utilitárias (ATR, pips/price conversion)
-- backtest_eurusd_ftmo.py: backtester básico (15m) com regras FTMO (template)
+This project is a modular and optimized trading bot developed in Python, designed for the automation of trading strategies, backtesting, and preparation for use on proprietary trading platforms such as FTMO.
 
-Requisitos:
+The bot is designed to interact with the MetaTrader 5 API and allows for backtesting of strategies using EURUSD OHLC data.
+
+## 2. Features
+
+- **Modularity**: The code is divided into independent modules for data handling, strategy, execution, and risk management.
+- **Backtesting**: Allows for strategy testing with historical data, including simulation of transaction costs and slippage.
+- **Live Trading**: Can connect to a MetaTrader 5 account to operate in real-time.
+- **Risk Management**: Implements FTMO-style rules, such as maximum daily loss and maximum total loss.
+- **Security**: Uses `.env` files for managing sensitive information, avoiding hardcoded keys in the code.
+
+## 3. Installation and Environment Setup
+
+### Prerequisites
+
 - Python 3.10+
-- MetaTrader5 terminal (para modo live) e pacote `MetaTrader5` instalado
+- MetaTrader 5 Terminal (for live trading)
 
-Como começar (local, VSCode):
-1. Cria e abre pasta `trading_bot_project/` no VSCode.
-2. Copia os ficheiros deste PR (ou desta conversa).
-3. `python -m venv .venv && source .venv/bin/activate` (Windows: `.venv\Scripts\activate`)
-4. `pip install -r requirements.txt`
-5. Para teste rápido (dryrun/backtest):
-   `python main.py --mode dryrun --data path/to/eurusd_15m.csv`
-6. Para live (após testar em demo): `python main.py --mode live`
+### Steps
 
-Notas:
-- O projeto é um esqueleto funcional. Implementa risk engine e integração MT5 básica.
-- Implementa lógica ATR-based para trailing stops; signals.py tem detectores placeholder.
-- Testa sempre em demo antes de ir real. FTMO rules (MDL, MaxLoss) são aplicadas no Risk Engine.
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd Next-to-me
+    ```
+
+2.  **Create a virtual environment:**
+    ```bash
+    python -m venv .venv
+    ```
+    - **Windows:**
+      ```bash
+      .venv\Scripts\activate
+      ```
+    - **Linux/macOS:**
+      ```bash
+      source .venv/bin/activate
+      ```
+
+3.  **Install the dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Configure environment variables:**
+    - Create a copy of `config.example.json` and rename it to `config.json`.
+    - Create a `.env` file for sensitive data (e.g., account credentials).
+    - An example `.env.example` file will be provided to show which variables are needed.
+
+## 4. How to Use
+
+The bot is executed from the command line through `main.py`.
+
+### Parameters
+
+-   `--mode`: Execution mode.
+    -   `dryrun`: Runs a backtest with historical data.
+    -   `live`: Operates in real-time with a MetaTrader 5 account.
+-   `--data`: Path to the CSV file with historical data (required for `dryrun` mode).
+-   `--config`: Path to the JSON configuration file (e.g., `config.json`).
+
+### Examples
+
+#### Backtesting (`dryrun`)
+
+To run a backtest using a historical data file named `eurusd_15m.csv`:
+```bash
+python main.py --mode dryrun --data path/to/eurusd_15m.csv --config config.json
+```
+
+#### Live Trading (`live`)
+
+To run the bot in live trading mode, connected to MetaTrader 5:
+```bash
+python main.py --mode live --config config.json
+```
+**Note:** Always test your strategies in a demo account before operating in a real account.
+
+## 5. Project Structure
+
+-   `main.py`: Main orchestrator of the bot.
+-   `data_handler.py`: Module for importing, cleaning, and processing data.
+-   `strategy.py`: Contains the trading logic and signal generation.
+-   `execution.py`: Handles the simulated or real execution of orders.
+-   `risk_management.py`: Manages risk, stop-loss, take-profit, and position sizing.
+-   `mt5_connector.py`: Connects to the MetaTrader 5 API.
+-   `utils.py`: Utility functions (logs, calculations, etc.).
+-   `config.json`: Configuration file for the bot's parameters.
+-   `.env`: File for environment variables (not versioned).
+-   `requirements.txt`: List of project dependencies.
+-   `tests/`: Directory with automated tests.

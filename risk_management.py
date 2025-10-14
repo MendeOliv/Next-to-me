@@ -8,6 +8,7 @@ ACCOUNT_INITIAL_BALANCE = 200000.0
 RISK_PER_TRADE = 0.01
 MDL_PERCENT = 0.05
 MAXLOSS_PERCENT = 0.10
+TRANSACTION_COST_PIPS = 0.7
 
 class AccountState:
     def __init__(self, initial_balance: float = ACCOUNT_INITIAL_BALANCE):
