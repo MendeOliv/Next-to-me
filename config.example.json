@@ -1,0 +1,24 @@
+{
+  "account": {
+    "initial_balance": 200000,
+    "currency": "USD"
+  },
+  "ftmo": {
+    "mdl_percent": 0.05,
+    "maxloss_percent": 0.10
+  },
+  "risk": {
+    "risk_per_trade": 0.01,
+    "max_concurrent_risk": 0.04
+  },
+  "atr": {
+    "period": 14,
+    "multiplier_15m": 1.8,
+    "multiplier_4h": 3.0
+  },
+  "broker": {
+    "symbol": "EURUSD",
+    "pip_value_per_lot": 10.0,
+    "max_lot_per_trade": 50.0
+  }
+}
