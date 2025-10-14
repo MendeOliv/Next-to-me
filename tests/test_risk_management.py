@@ -1,25 +1,25 @@
 # tests/test_risk_management.py
-import unittest
-from risk_management import compute_lot_size
+from risk_management import position_size
+import pytest
 
-class TestRiskManagement(unittest.TestCase):
-    def test_compute_lot_size(self):
-        """
-        Tests that the lot size is computed correctly.
-        """
-        equity = 100000
-        stop_loss_pips = 100
-        lot_size = compute_lot_size(equity, stop_loss_pips)
-        self.assertEqual(lot_size, 1.0)
+def test_position_size():
+    """
+    Tests that the lot size is computed correctly.
+    """
+    balance = 100000
+    risk_per_trade_pct = 1.0
+    stop_loss_pips = 100
+    pip_value = 10.0
+    lot_size = position_size(balance, risk_per_trade_pct, stop_loss_pips, pip_value)
+    assert lot_size == 0.1
 
-    def test_compute_lot_size_with_zero_stop_loss(self):
-        """
-        Tests that the lot size is 0 if the stop loss is 0.
-        """
-        equity = 100000
-        stop_loss_pips = 0
-        lot_size = compute_lot_size(equity, stop_loss_pips)
-        self.assertEqual(lot_size, 0.0)
-
-if __name__ == '__main__':
-    unittest.main()
+def test_position_size_with_zero_stop_loss():
+    """
+    Tests that the function raises a ValueError if the stop loss is 0.
+    """
+    balance = 100000
+    risk_per_trade_pct = 1.0
+    stop_loss_pips = 0
+    pip_value = 10.0
+    with pytest.raises(ValueError):
+        position_size(balance, risk_per_trade_pct, stop_loss_pips, pip_value)

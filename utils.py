@@ -2,29 +2,24 @@
 import pandas as pd
 import numpy as np
 import logging
-import sys
+from logging.handlers import RotatingFileHandler
+import os
 
-def setup_logging(level=logging.INFO):
-    """
-    Sets up a logger that outputs to both a file and the console.
-    """
-    logger = logging.getLogger()
-    logger.setLevel(level)
-
-    # File handler
-    file_handler = logging.FileHandler("trading_bot.log")
-    file_handler.setLevel(level)
-    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-
-    # Console handler
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setLevel(level)
-    stream_formatter = logging.Formatter('%(message)s')
-    stream_handler.setFormatter(stream_formatter)
-    logger.addHandler(stream_handler)
-
+def get_logger(name="next_to_me", log_dir="logs"):
+    os.makedirs(log_dir, exist_ok=True)
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger
+    logger.setLevel(logging.DEBUG)
+    fh = RotatingFileHandler(os.path.join(log_dir, f"{name}.log"), maxBytes=5_000_000, backupCount=5)
+    fh.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    fh.setFormatter(fmt)
+    ch.setFormatter(fmt)
+    logger.addHandler(fh)
+    logger.addHandler(ch)
     return logger
 
 def price_to_pips(price_diff: float) -> float:

@@ -1,101 +1,47 @@
 # backtest_eurusd_ftmo.py
 import pandas as pd
-import logging
-import random
-from utils import compute_atr, pips_to_price, price_to_pips
-from risk_management import ACCOUNT_INITIAL_BALANCE, RISK_PER_TRADE, MDL_PERCENT, MAXLOSS_PERCENT, TRANSACTION_COST_PIPS
-from data_handler import load_historical_data
+from utils import get_logger
+from data_handler import load_csv_data
+from strategy import generate_signals
+from execution import simulate_order_fill, log_trade
+from risk_management import position_size
 
-class FTMOBacktester:
-    def __init__(self, df_15m: pd.DataFrame, transaction_cost_pips: float = TRANSACTION_COST_PIPS, slippage_pips: float = 0.1):
-        self.df = df_15m.copy()
-        self.df['atr'] = compute_atr(self.df)
-        self.initial_balance = ACCOUNT_INITIAL_BALANCE
-        self.balance = self.initial_balance
-        self.open_positions = []
-        self.trades = []
-        self.daily_pnl = 0.0
-        self.start_of_day = None
-        self.transaction_cost = pips_to_price(transaction_cost_pips)
-        self.slippage_pips = slippage_pips
-        self.peak_equity = self.initial_balance
-        self.max_drawdown = 0.0
+logger = get_logger("backtester")
 
-    def reset_daily_if_needed(self, now):
-        today = pd.to_datetime(now).date()
-        if self.start_of_day is None or self.start_of_day != today:
-            self.daily_pnl = 0.0
-            self.start_of_day = today
+def backtest(path_to_csv: str, config: dict):
+    df = load_csv_data(path_to_csv)
+    params = config.get('strategy_params', {'short_window': 50, 'long_window': 200})
+    signals = generate_signals(df, params)
 
-    def check_limits(self):
-        MDL_value = self.initial_balance * MDL_PERCENT
-        MAXLOSS_value = self.initial_balance * MAXLOSS_PERCENT
-        equity = self.balance + sum([p.get('unrealized', 0.0) for p in self.open_positions])
-        if equity <= self.initial_balance - MAXLOSS_value:
-            return 'MAXLOSS'
-        if self.daily_pnl <= -(self.initial_balance * MDL_PERCENT):
-            return 'MDL'
-        return 'OK'
+    balance = config['initial_balance']
+    trades = []
 
-    def run(self):
-        # Template loop: no signal logic included. Replace detect logic as needed.
-        for i in range(14, len(self.df) - 1):
-            candle = self.df.iloc[i]
-            now = candle['datetime']
-            self.reset_daily_if_needed(now)
-            status = self.check_limits()
-            if status != 'OK':
-                # stop opening new trades for this day / overall
-                continue
+    for i in range(1, len(signals)):
+        if signals['positions'][i] == 1.0: # Buy signal
+            stop_loss_pips = 100 # Example stop loss
+            lot_size = position_size(balance, config['risk']['risk_per_trade_pct'], stop_loss_pips, config['execution']['pip_value'])
 
-            # Placeholder trading logic: open a trade and close it on the next candle
-            if not self.open_positions:
-                slippage = random.uniform(-self.slippage_pips, self.slippage_pips)
-                entry_price = self.df.iloc[i + 1]['open'] + pips_to_price(slippage)
+            entry_price = df['open'][i]
+            fill_price = simulate_order_fill(entry_price, 'buy', lot_size, **config['execution'])
 
-                trade = {
-                    'entry_price': entry_price,
-                    'exit_price': self.df.iloc[i + 1]['close'] + pips_to_price(random.uniform(-self.slippage_pips, self.slippage_pips)),
-                    'side': 'buy',
-                    'entry_time': now,
-                    'exit_time': self.df.iloc[i + 1]['datetime'],
-                }
+            # For simplicity, close on the next candle
+            exit_price = df['open'][i+1] if i+1 < len(df) else df['close'][i]
+            pnl = (exit_price - fill_price) * lot_size * 100000 # Simplified PnL
+            balance += pnl
 
-                pnl = (trade['exit_price'] - trade['entry_price']) - self.transaction_cost
-                self.balance += pnl
-                self.daily_pnl += pnl
-                self.trades.append(trade)
+            trade_data = {
+                "timestamp": signals.index[i],
+                "order_id": len(trades) + 1,
+                "side": "buy",
+                "volume": lot_size,
+                "entry_price": fill_price,
+                "exit_price": exit_price,
+                "pnl": pnl,
+                "balance_after": balance,
+                "reason": "MA Crossover"
+            }
+            log_trade(trade_data)
+            trades.append(trade_data)
 
-                # Update equity and calculate drawdown
-                equity = self.balance
-                self.peak_equity = max(self.peak_equity, equity)
-                drawdown = (self.peak_equity - equity) / self.peak_equity
-                self.max_drawdown = max(self.max_drawdown, drawdown)
-
-        # summary
-        final_balance = self.balance
-        total_return = (final_balance - self.initial_balance) / self.initial_balance
-
-        if self.trades:
-            returns = pd.Series([t['exit_price'] - t['entry_price'] for t in self.trades])
-            sharpe_ratio = returns.mean() / returns.std() if returns.std() > 0 else 0
-            win_rate = (returns > 0).mean()
-        else:
-            sharpe_ratio = 0
-            win_rate = 0
-
-        return {
-            "initial_balance": self.initial_balance,
-            "final_balance": final_balance,
-            "n_trades": len(self.trades),
-            "total_return": total_return,
-            "sharpe_ratio": sharpe_ratio,
-            "win_rate": win_rate,
-            "max_drawdown": self.max_drawdown,
-        }
-
-def backtest(path_to_csv: str):
-    df = load_historical_data(path_to_csv)
-    bt = FTMOBacktester(df)
-    res = bt.run()
-    logging.info(f"Backtest result: {res}")
+    logger.info(f"Backtest complete. Final balance: {balance}")
+    return trades

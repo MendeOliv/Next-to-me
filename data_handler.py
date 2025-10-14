@@ -1,22 +1,35 @@
 # data_handler.py
 import pandas as pd
+from utils import get_logger
 
-def load_historical_data(filepath: str) -> pd.DataFrame:
+logger = get_logger("data_handler")
+
+def load_csv_data(path) -> pd.DataFrame:
     """
-    Loads historical OHLC data from a CSV file.
-
-    Args:
-        filepath: The path to the CSV file.
-
-    Returns:
-        A pandas DataFrame with the loaded data.
+    Loads historical data from a CSV file, normalizes timestamps to UTC,
+    and validates the data.
     """
-    try:
-        df = pd.read_csv(filepath, parse_dates=['datetime'])
-        return df
-    except FileNotFoundError:
-        print(f"Error: The file '{filepath}' was not found.")
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"An error occurred while loading the data: {e}")
-        return pd.DataFrame()
+    df = pd.read_csv(path, parse_dates=True, index_col=0)
+    df.index = pd.to_datetime(df.index, utc=True)
+
+    # Validate data
+    if df.isnull().values.any():
+        logger.warning("NaN values found in data. Applying forward-fill.")
+        df.fillna(method='ffill', inplace=True)
+    if df.index.duplicated().any():
+        logger.warning("Duplicate timestamps found. Removing duplicates.")
+        df = df[~df.index.duplicated(keep='first')]
+
+    logger.info(f"Loaded and validated data from {path}.")
+    return df
+
+def resample(df, timeframe) -> pd.DataFrame:
+    """
+    Resamples the dataframe to the given timeframe.
+    """
+    return df.resample(timeframe).agg({
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last'
+    }).dropna()

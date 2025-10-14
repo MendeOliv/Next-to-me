@@ -1,18 +1,14 @@
 # tests/test_strategy.py
-import unittest
 import pandas as pd
-from strategy import detect_price_action_entry
+from strategy import generate_signals
 
-class TestStrategy(unittest.TestCase):
-    def test_detect_price_action_entry(self):
-        """
-        Tests that the detect_price_action_entry function returns a dictionary with the expected keys.
-        """
-        df_15m = pd.DataFrame({'close': [1.0, 1.1, 1.2]})
-        df_4h = pd.DataFrame({'close': [1.0, 1.1, 1.2]})
-        signal = detect_price_action_entry(df_15m, df_4h)
-        self.assertIsInstance(signal, dict)
-        self.assertIn('is_entry', signal)
-
-if __name__ == '__main__':
-    unittest.main()
+def test_generate_signals():
+    """
+    Tests that the generate_signals function returns a DataFrame with a 'signal' column.
+    """
+    data = {'close': [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9]}
+    df = pd.DataFrame(data)
+    params = {'short_window': 2, 'long_window': 5}
+    signals = generate_signals(df, params)
+    assert isinstance(signals, pd.DataFrame)
+    assert 'signal' in signals.columns
