@@ -1,42 +1,47 @@
 # order_manager.py
-from utils import pips_to_price, price_to_pips
-from mt5_connector import send_market_order
-from typing import Optional
+from utils import get_logger, pips_to_price
+from typing import Dict, Optional
 
-ATR_MULTIPLIER_15M = 1.8
-ATR_MULTIPLIER_4H = 3.0
+logger = get_logger("order_manager")
 
-def calculate_trailing_stop(entry_price: float, highest_since_entry: float, atr_value_pips: float, side: str, timeframe: str) -> float:
-    """
-    Returns desired stop price (absolute) based on ATR multiplier and highest/lowest since entry.
-    """
-    if timeframe == '15m':
-        mult = ATR_MULTIPLIER_15M
-    else:
-        mult = ATR_MULTIPLIER_4H
-    trail_pips = atr_value_pips * mult
-    trail_price_diff = pips_to_price(trail_pips)
-    if side == 'buy':
-        desired_stop = highest_since_entry - trail_price_diff
-    else:
-        desired_stop = highest_since_entry + trail_price_diff
-    return desired_stop
+class OrderManager:
+    def __init__(self, atr_multiplier: float = 2.0):
+        self.pending_orders: Dict = {}
+        self.open_positions: Dict = {}
+        self.atr_multiplier = atr_multiplier
 
-def open_order(symbol: str, side: str, lots: float, entry_price: float, stop_pips: float, tp_pips: Optional[float] = None, comment: str = ''):
-    """
-    Convenience wrapper: calculates absolute SL/TP and sends market order.
-    entry_price parameter used for calculating SL/TP price (it's approximate).
-    """
-    sl_price = None
-    tp_price = None
-    if side == 'buy':
-        sl_price = entry_price - pips_to_price(stop_pips)
-        if tp_pips:
-            tp_price = entry_price + pips_to_price(tp_pips)
-    else:
-        sl_price = entry_price + pips_to_price(stop_pips)
-        if tp_pips:
-            tp_price = entry_price - pips_to_price(tp_pips)
+    def add_pending_order(self, order_id, symbol, side, lots, entry_price, sl, tp):
+        self.pending_orders[order_id] = {
+            "symbol": symbol,
+            "side": side,
+            "lots": lots,
+            "entry_price": entry_price,
+            "sl": sl,
+            "tp": tp,
+        }
+        logger.info(f"Added pending order: {order_id}")
 
-    result = send_market_order(symbol, lots, side, sl=sl_price, tp=tp_price, comment=comment)
-    return result
+    def reconcile_partial_fill(self, order_id, filled_lots):
+        if order_id in self.pending_orders:
+            self.pending_orders[order_id]['lots'] -= filled_lots
+            if self.pending_orders[order_id]['lots'] <= 0:
+                del self.pending_orders[order_id]
+                logger.info(f"Pending order {order_id} fully filled.")
+            else:
+                logger.info(f"Pending order {order_id} partially filled. Remaining lots: {self.pending_orders[order_id]['lots']}")
+
+    def update_trailing_stop(self, position_id, current_price, atr_pips):
+        if position_id in self.open_positions:
+            position = self.open_positions[position_id]
+            new_sl = 0
+
+            if position['side'] == 'buy':
+                new_sl = current_price - pips_to_price(atr_pips * self.atr_multiplier)
+                if new_sl > position['sl']:
+                    position['sl'] = new_sl
+                    logger.info(f"Updated trailing stop for position {position_id} to {new_sl}.")
+            else: # Sell
+                new_sl = current_price + pips_to_price(atr_pips * self.atr_multiplier)
+                if new_sl < position['sl']:
+                    position['sl'] = new_sl
+                    logger.info(f"Updated trailing stop for position {position_id} to {new_sl}.")

@@ -3,62 +3,34 @@ import MetaTrader5 as mt5
 from typing import Optional
 import time
 import os
-from dotenv import load_dotenv
+from utils import get_logger
 
-load_dotenv()
+logger = get_logger("mt5_connector")
 
-def initialize(path: Optional[str] = None) -> bool:
-    """
-    Initializes MT5. Optionally, you can provide the path to the terminal.
-    Example: initialize(r"C:\\Program Files\\MetaTrader 5\\terminal64.exe")
-    """
-    if path:
-        res = mt5.initialize(path)
-    else:
-        res = mt5.initialize()
+def connect():
+    login = os.environ.get("MT5_LOGIN")
+    password = os.environ.get("MT5_PASSWORD")
+    server = os.environ.get("MT5_SERVER")
 
-    if not res:
+    if not mt5.initialize():
+        logger.error(f"MT5 initialize failed, last_error={mt5.last_error()}")
         raise RuntimeError(f"MT5 initialize failed, last_error={mt5.last_error()}")
 
-    # Login with credentials from .env file
-    login = int(os.getenv("MT5_LOGIN", "0"))
-    password = os.getenv("MT5_PASSWORD", "")
-    server = os.getenv("MT5_SERVER", "")
-
-    if not mt5.login(login, password, server):
+    if not mt5.login(int(login), password, server):
+        logger.error(f"MT5 login failed, last_error={mt5.last_error()}")
         raise RuntimeError(f"MT5 login failed, last_error={mt5.last_error()}")
 
-    return True
+    logger.info("Connecting to MT5 with login: %s", login)
 
 def shutdown():
     mt5.shutdown()
+    logger.info("MT5 connection shut down.")
 
-def account_info():
-    info = mt5.account_info()
-    return info._asdict() if info else None
-
-def get_rates(symbol: str, timeframe, n=500):
-    """
-    Wrapper to mt5.copy_rates_from_pos
-    timeframe: mt5.TIMEFRAME_M1, TIMEFRAME_M5, TIMEFRAME_M15, TIMEFRAME_H4, etc.
-    """
-    rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, n)
-    if rates is None:
-        return None
-    import pandas as pd
-    df = pd.DataFrame(rates)
-    df['datetime'] = pd.to_datetime(df['time'], unit='s')
-    df = df[['datetime', 'open', 'high', 'low', 'close', 'tick_volume']].rename(columns={'tick_volume':'volume'})
-    return df
-
-def send_market_order(symbol: str, lot: float, side: str, sl: Optional[float] = None, tp: Optional[float] = None, comment: str = ''):
-    """
-    Envia ordem de mercado (market order). sl/tp são preços absolutos.
-    side: 'buy' ou 'sell'
-    """
+def place_order(symbol: str, lot: float, side: str, sl: Optional[float] = None, tp: Optional[float] = None, comment: str = ''):
     request_type = mt5.ORDER_TYPE_BUY if side.lower() == 'buy' else mt5.ORDER_TYPE_SELL
     tick = mt5.symbol_info_tick(symbol)
     if tick is None:
+        logger.error(f"Symbol tick not available for {symbol}.")
         raise RuntimeError("Symbol tick not available: " + symbol)
     price = tick.ask if side.lower() == 'buy' else tick.bid
     deviation = 20
@@ -78,20 +50,19 @@ def send_market_order(symbol: str, lot: float, side: str, sl: Optional[float] = 
     if tp is not None:
         request['tp'] = float(tp)
     result = mt5.order_send(request)
+    logger.info(f"Order send result: {result}")
     return result
 
-def close_position_by_ticket(ticket: int):
-    pos = mt5.positions_get(ticket=ticket)
-    if not pos:
-        return None
-    pos = pos[0]
-    symbol = pos.symbol
-    volume = pos.volume
-    side = 'sell' if pos.type == mt5.ORDER_TYPE_BUY else 'buy'
-    return send_market_order(symbol, volume, side, comment=f"close-{ticket}")
+def get_positions():
+    positions = mt5.positions_get()
+    if positions is None:
+        return []
+    return positions
 
 def is_connected():
     """
     Checks if the terminal is connected to the trade server.
     """
-    return mt5.terminal_info().connected
+    connected = mt5.terminal_info().connected
+    logger.debug(f"MT5 connection status: {connected}")
+    return connected
