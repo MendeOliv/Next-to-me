@@ -11,7 +11,7 @@ def initialize(path: Optional[str] = None) -> bool:
     if path:
         res = mt5.initialize(path)
     else:
-        res = mt5.initialize()
+        res = mt5.initialize() # pyright: ignore[reportAttributeAccessIssue]
     if not res:
         raise RuntimeError(f"MT5 initialize failed, last_error={mt5.last_error()}")
     return True
