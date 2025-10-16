@@ -3,3 +3,6 @@ numpy
 ta
 python-dotenv
 pytest
+joblib
+aiohttp
+requests

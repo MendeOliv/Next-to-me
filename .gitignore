@@ -6,3 +6,5 @@ trades_backtest.csv
 *.zip
 config.json
 logs/
+cache/
+risk_state.json
