@@ -1,24 +1,23 @@
 {
-  "account": {
-    "initial_balance": 200000,
-    "currency": "USD"
-  },
-  "ftmo": {
-    "mdl_percent": 0.05,
-    "maxloss_percent": 0.10
+  "mode": "backtest",
+  "instrument": "EURUSD",
+  "data": {"path": "dummy_data.csv"},
+  "initial_balance": 10000,
+  "strategy": {
+    "short_window": 20,
+    "long_window": 50,
+    "stop_loss_pips": 50,
+    "take_profit_pips": 100
   },
   "risk": {
-    "risk_per_trade": 0.01,
-    "max_concurrent_risk": 0.04
+    "risk_per_trade_pct": 1.0,
+    "max_daily_loss_pct": 5.0,
+    "max_total_loss_pct": 10.0
   },
-  "atr": {
-    "period": 14,
-    "multiplier_15m": 1.8,
-    "multiplier_4h": 3.0
-  },
-  "broker": {
-    "symbol": "EURUSD",
-    "pip_value_per_lot": 10.0,
-    "max_lot_per_trade": 50.0
+  "execution": {
+    "slippage_pips": 1.0,
+    "spread_pips": 0.1,
+    "pip_value": 10.0,
+    "latency_ms": 100
   }
 }

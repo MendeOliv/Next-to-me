@@ -1,68 +1,79 @@
 # mt5_connector.py
-import MetaTrader5 as mt5
-from typing import Optional
 import time
+import random
+from utils import logger
 import os
-from utils import get_logger
 
-logger = get_logger("mt5_connector")
+try:
+    import MetaTrader5 as mt5
+except Exception:
+    mt5 = None
+    logger.warning("MetaTrader5 package not available; live execution disabled")
 
-def connect():
-    login = os.environ.get("MT5_LOGIN")
-    password = os.environ.get("MT5_PASSWORD")
-    server = os.environ.get("MT5_SERVER")
+class MT5Connector:
+    def __init__(self, login=None, password=None, server=None, max_retries=5):
+        self.login = login or os.environ.get("MT5_LOGIN")
+        self.password = password or os.environ.get("MT5_PASS")
+        self.server = server or os.environ.get("MT5_SERVER")
+        self.max_retries = max_retries
+        self.connected = False
 
-    if not mt5.initialize():
-        logger.error(f"MT5 initialize failed, last_error={mt5.last_error()}")
-        raise RuntimeError(f"MT5 initialize failed, last_error={mt5.last_error()}")
+    def connect(self):
+        attempt = 0
+        while attempt < self.max_retries:
+            try:
+                if mt5 is None:
+                    raise RuntimeError("MT5 library not installed")
+                ok = mt5.initialize(login=int(self.login), password=self.password, server=self.server)
+                if ok:
+                    self.connected = True
+                    logger.info("MT5 connected")
+                    return True
+                else:
+                    raise RuntimeError("MT5 initialize returned False")
+            except Exception as e:
+                attempt += 1
+                wait = 2 ** attempt
+                logger.warning(f"MT5 connect attempt {attempt} failed: {e}. Retry in {wait}s")
+                time.sleep(wait)
+        logger.error("MT5 connect failed after retries")
+        raise ConnectionError("MT5 connect failed")
 
-    if not mt5.login(int(login), password, server):
-        logger.error(f"MT5 login failed, last_error={mt5.last_error()}")
-        raise RuntimeError(f"MT5 login failed, last_error={mt5.last_error()}")
-
-    logger.info("Connecting to MT5 with login: %s", login)
-
-def shutdown():
-    mt5.shutdown()
-    logger.info("MT5 connection shut down.")
-
-def place_order(symbol: str, lot: float, side: str, sl: Optional[float] = None, tp: Optional[float] = None, comment: str = ''):
-    request_type = mt5.ORDER_TYPE_BUY if side.lower() == 'buy' else mt5.ORDER_TYPE_SELL
-    tick = mt5.symbol_info_tick(symbol)
-    if tick is None:
-        logger.error(f"Symbol tick not available for {symbol}.")
-        raise RuntimeError("Symbol tick not available: " + symbol)
-    price = tick.ask if side.lower() == 'buy' else tick.bid
-    deviation = 20
-    request = {
-        "action": mt5.TRADE_ACTION_DEAL,
-        "symbol": symbol,
-        "volume": float(lot),
-        "type": request_type,
-        "price": price,
-        "deviation": deviation,
-        "magic": 234000,
-        "comment": comment,
-        "type_filling": mt5.ORDER_FILLING_IOC,
-    }
-    if sl is not None:
-        request['sl'] = float(sl)
-    if tp is not None:
-        request['tp'] = float(tp)
-    result = mt5.order_send(request)
-    logger.info(f"Order send result: {result}")
-    return result
-
-def get_positions():
-    positions = mt5.positions_get()
-    if positions is None:
-        return []
-    return positions
-
-def is_connected():
-    """
-    Checks if the terminal is connected to the trade server.
-    """
-    connected = mt5.terminal_info().connected
-    logger.debug(f"MT5 connection status: {connected}")
-    return connected
+    def place_order(self, instrument, side, volume, price=None, sl=None, tp=None):
+        if not self.connected:
+            self.connect()
+        attempt = 0
+        while attempt < self.max_retries:
+            try:
+                request = {
+                    "action": mt5.TRADE_ACTION_DEAL,
+                    "symbol": instrument,
+                    "volume": float(volume),
+                    "type": mt5.ORDER_TYPE_BUY if side.lower() == "buy" else mt5.ORDER_TYPE_SELL,
+                    "price": price,
+                    "sl": sl,
+                    "tp": tp,
+                    "deviation": 20,
+                    "magic": 234000,
+                    "comment": "next_to_me"
+                }
+                result = mt5.order_send(request)
+                if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                    logger.info(f"MT5 order placed: {result.order}")
+                    return {
+                        "order_id": result.order,
+                        "instrument": instrument,
+                        "side": side,
+                        "volume": volume,
+                        "entry_price": result.price,
+                        "status": "filled"
+                    }
+                else:
+                    raise RuntimeError(f"MT5 order failed: {getattr(result,'comment',result)}")
+            except Exception as e:
+                attempt += 1
+                wait = 2 ** attempt
+                logger.warning(f"MT5 place_order attempt {attempt} failed: {e}. Retry in {wait}s")
+                time.sleep(wait)
+        logger.error("MT5 place_order failed after retries")
+        raise RuntimeError("MT5 place_order failed")
