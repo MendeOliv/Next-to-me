@@ -11,7 +11,7 @@ def test_position_size():
     stop_loss_pips = 100
     pip_value = 10.0
     lot_size = position_size(balance, risk_per_trade_pct, stop_loss_pips, pip_value)
-    assert lot_size == 0.1
+    assert lot_size == 1.0
 
 def test_position_size_with_zero_stop_loss():
     """

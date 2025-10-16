@@ -1,50 +1,37 @@
 # risk_management.py
-from datetime import date
-from typing import List
-from utils import get_logger, price_to_pips, pips_to_price
-import json
-import os
+from utils import logger
+import json, os
 
-logger = get_logger("risk_management")
+STATE_FILE = os.environ.get("RISK_STATE_FILE", "risk_state.json")
 
-def position_size(balance, risk_per_trade_pct, stop_loss_pips, pip_value):
-    risk_amount = balance * (risk_per_trade_pct / 100.0)
+def position_size(balance, risk_per_trade_pct, stop_loss_pips, pip_value, lot_unit_scale=1.0):
+    """
+    balance: capital disponível
+    risk_per_trade_pct: % do balance a arriscar por trade (ex: 1.0)
+    stop_loss_pips: pips até stop loss (positivo)
+    pip_value: USD por pip para 1 lote padrão
+    lot_unit_scale: escala - por padrão 1.0 => retorno em lotes padrão
+    """
     if stop_loss_pips <= 0:
         logger.error("stop_loss_pips must be > 0")
         raise ValueError("stop_loss_pips must be > 0")
+    risk_amount = balance * (risk_per_trade_pct / 100.0)
     volume = risk_amount / (stop_loss_pips * pip_value)
-    return max(volume, 0.0001)
+    volume = volume * lot_unit_scale
+    return max(round(volume, 4), 0.0001)
 
-def load_risk_state(filepath="risk_state.json"):
-    if os.path.exists(filepath):
-        with open(filepath, 'r') as f:
-            state = json.load(f)
-            logger.info("Risk state loaded.")
-            return state
-    logger.warning("No risk state file found. Starting fresh.")
-    return {"balance": 0, "max_drawdown": 0, "daily_loss": 0, "daily_loss_pct": 0, "total_drawdown_pct": 0}
+def load_risk_state():
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Could not load risk state: {e}")
+    return {"balance": None, "peak_balance": None, "daily_loss": 0.0, "total_drawdown_pct": 0.0}
 
-def save_risk_state(state, filepath="risk_state.json"):
-    with open(filepath, 'w') as f:
-        json.dump(state, f, indent=4)
-    logger.info("Risk state saved.")
-
-class AccountState:
-    def __init__(self, initial_balance: float):
-        self.initial_balance = initial_balance
-        self.balance = initial_balance
-        self.equity = initial_balance
-        self.daily_pnl = 0.0
-        self._day = date.today()
-        self.open_positions = []
-
-    def reset_daily(self):
-        if date.today() != self._day:
-            self.daily_pnl = 0.0
-            self._day = date.today()
-            logger.info("Resetting daily PnL.")
-
-    def update_equity(self):
-        unreal = sum([p.get('unrealized', 0.0) for p in self.open_positions])
-        self.equity = self.balance + unreal
-        logger.debug(f"Equity updated to: {self.equity}")
+def save_risk_state(state):
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(state, f)
+    except Exception as e:
+        logger.error(f"Failed to save risk state: {e}")
