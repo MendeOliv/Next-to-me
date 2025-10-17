@@ -85,8 +85,21 @@ def send_order(signal, balance, risk_config, strategy_config, current_price):
         sl=sl
     )
 
-def execute_trade(signal, balance, risk_config, strategy_config, current_price, live=False):
-    if live:
-        return send_order(signal, balance, risk_config, strategy_config, current_price)
+def execute_trade(signal, balance, risk_config, strategy_config=None, current_price=None, live=False):
+    # Backwards-compatible wrapper: tests may pass risk_config as a float (risk percent)
+    if isinstance(risk_config, (int, float)):
+        # if <1 assume fraction, convert to percent
+        risk_conf = {'risk_per_trade_pct': float(risk_config)*100 if risk_config < 1.0 else float(risk_config)}
     else:
-        return simulate_trade(signal, balance, risk_config, strategy_config, current_price)
+        risk_conf = risk_config or {}
+    # ensure execution defaults & instrument
+    risk_conf.setdefault('execution', {'pip_value': 10.0, 'slippage_pips': 1.0, 'spread_pips': 0.1})
+    risk_conf.setdefault('instrument', 'EURUSD')
+    if strategy_config is None:
+        strategy_config = {'stop_loss_pips': float(os.getenv('DEFAULT_STOP_LOSS_PIPS', 50))}
+    if current_price is None:
+        current_price = float(os.getenv('DEFAULT_PRICE', 1.0))
+    if live:
+        return send_order(signal, balance, risk_conf, strategy_config, current_price)
+    else:
+        return simulate_trade(signal, balance, risk_conf, strategy_config, current_price)

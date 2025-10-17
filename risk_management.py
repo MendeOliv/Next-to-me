@@ -12,6 +12,13 @@ def calculate_position_size(balance, stop_loss_pips, risk_percent):
     position_size = risk_amount / stop_loss_pips
     return round(position_size, 2)
 
+def position_size(balance, risk_per_trade_pct, stop_loss_pips, pip_value):
+    if stop_loss_pips <= 0:
+        raise ValueError('stop_loss_pips must be > 0')
+    risk_amount = balance * (risk_per_trade_pct / 100.0)
+    volume = risk_amount / (stop_loss_pips * pip_value)
+    return volume
+
 def load_risk_state():
     if os.path.exists(STATE_FILE):
         try:

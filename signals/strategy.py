@@ -5,8 +5,8 @@ import pandas as pd
 def generate_signal(df):
     if len(df) < 14:
         return None  # Evite cálculos em dados incompletos
-    # df['rsi'] = ta.RSI(df['close'], timeperiod=14)
-    # Placeholder for RSI calculation using pandas rolling
+
+    df = df.copy()
     delta = df['close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
