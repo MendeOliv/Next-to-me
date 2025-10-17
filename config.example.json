@@ -1,3 +1,4 @@
+#//config.exemple.json
 {
   "mode": "backtest",
   "instrument": "EURUSD",
