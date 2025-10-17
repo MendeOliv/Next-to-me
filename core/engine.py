@@ -100,3 +100,25 @@ def execute_trade(signal, balance, risk_config, strategy_config=None, current_pr
         return send_order(signal, balance, risk_conf, strategy_config, current_price)
     else:
         return simulate_trade(signal, balance, risk_conf, strategy_config, current_price)
+# --- Async wrappers for integration with asyncio loops ---
+async def async_get_data(symbol, timeframe, start=None, end=None, live=False):
+    """
+    Async wrapper around get_data / fetch_historical_data.
+    Uses asyncio.to_thread to run blocking pandas IO in a thread.
+    """
+    return await asyncio.to_thread(get_data, symbol, timeframe, start, end, live)
+
+async def async_simulate_trade(signal, balance, config, strategy_config, current_price):
+    """Async wrapper for simulate_trade"""
+    return await asyncio.to_thread(simulate_trade, signal, balance, config, strategy_config, current_price)
+
+async def async_send_order(signal, balance, risk_config, strategy_config, current_price):
+    """Async wrapper for send_order (MT5 live wrapper)"""
+    return await asyncio.to_thread(send_order, signal, balance, risk_config, strategy_config, current_price)
+
+async def async_execute_trade(signal, balance, risk_config, strategy_config=None, current_price=None, live=False):
+    """
+    Async wrapper for execute_trade.
+    Keeps behaviour identical; just runs in thread to avoid blocking.
+    """
+    return await asyncio.to_thread(execute_trade, signal, balance, risk_config, strategy_config, current_price, live)
