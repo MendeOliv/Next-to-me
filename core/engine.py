@@ -1,13 +1,10 @@
 # core/engine.py
 import os
 import pandas as pd
-from dotenv import load_dotenv
 from utils import logger
 from mt5_connector import MT5Connector
 from execution import SimulatedExecution
 from risk_management import calculate_position_size
-
-load_dotenv()
 
 # --- Data Fetching ---
 def fetch_historical_data(symbol, timeframe, start=None, end=None):

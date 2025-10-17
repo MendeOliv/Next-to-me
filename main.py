@@ -1,22 +1,25 @@
 # main.py
-import json, os, time
-import pandas as pd
-from dotenv import load_dotenv
-from utils import logger, save_trades_csv
+import asyncio
+from utils import logger
+from config_loader import load_config
 from core.engine import get_data, execute_trade
 from signals.strategy import generate_signal
 from risk_management import calculate_position_size
+import pandas as pd
 
-load_dotenv()
+async def run_live(config):
+    logger.info("Live mode starting.")
+    while True:
+        # A lógica de dados ao vivo ainda é um placeholder.
+        # Numa implementação real, a chamada `get_data` seria assíncrona (`await get_data(...)`)
+        # e usaria, por exemplo, aiohttp ou um cliente de websocket.
+        logger.info("Fetching live data (placeholder)...")
+        await asyncio.sleep(60) # Pausa assíncrona
 
-def run_backtest():
-    config_path = os.getenv('CONFIG_PATH', 'config.example.json')
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-
+def run_backtest(config):
     data = get_data(
-        symbol=os.getenv('SYMBOL'),
-        timeframe=os.getenv('TIMEFRAME'),
+        symbol=config['symbol'],
+        timeframe=config['timeframe'],
         live=False
     )
     if data.empty:
@@ -24,8 +27,7 @@ def run_backtest():
         return
 
     results = []
-    balance = float(os.getenv('INITIAL_BALANCE', 10000))
-    risk_percent = float(os.getenv('RISK_PERCENT', 0.02))
+    balance = config['initial_balance']
 
     for i in range(1, len(data)):
         df_slice = data.iloc[:i]
@@ -37,21 +39,17 @@ def run_backtest():
             results.append(result)
             balance = result.get('balance_after', balance)
 
-    save_trades_csv(results)
-    logger.info("Backtest finished.")
-
-def run_live():
-    logger.info("Live mode starting.")
-    # A lógica de execução ao vivo foi simplificada para focar na estrutura.
-    # A implementação completa exigiria um loop de polling ou websocket.
-    while True:
-        # Placeholder para a lógica de dados ao vivo
-        time.sleep(60)
+    pd.DataFrame(results).to_csv('backtest_results.csv', index=False)
+    logger.info("Backtest finished. Results saved to backtest_results.csv")
 
 if __name__ == "__main__":
-    live_mode = os.getenv('LIVE_MODE', 'False').lower() in ('true', '1', 't')
+    try:
+        cfg = load_config()
 
-    if live_mode:
-        run_live()
-    else:
-        run_backtest()
+        if cfg['live_mode']:
+            asyncio.run(run_live(cfg))
+        else:
+            run_backtest(cfg)
+
+    except ValueError as e:
+        logger.error(f"Erro de configuração: {e}")
