@@ -1,96 +1,98 @@
-# Next-to-me Trading Bot
+# Next-to-Me Trading Bot
 
-## 1. Purpose
+Este é um robô de trading modular em Python, projetado para ser robusto, testável e seguro, ideal para ambientes de backtesting e preparação para `prop trading`.
 
-This project is a modular and optimized trading bot developed in Python, designed for the automation of trading strategies, backtesting, and preparation for use on proprietary trading platforms such as FTMO.
+## Arquitetura
 
-The bot is designed to interact with the MetaTrader 5 API and allows for backtesting of strategies using EURUSD OHLC data.
+O bot utiliza uma arquitetura modular e centralizada:
 
-## 2. Features
+-   **`main.py`**: Ponto de entrada que orquestra os modos de execução (`backtest` ou `live`).
+-   **`core/engine.py`**: O coração do bot, responsável por buscar dados e executar ordens.
+-   **`signals/strategy.py`**: Módulo dedicado à geração de sinais de trading (atualmente, uma estratégia baseada em RSI).
+-   **`risk_management.py`**: Gerencia o cálculo de tamanho de posição e o estado de risco da conta.
+-   **`utils.py`**: Fornece um logger centralizado e outras funções auxiliares.
+-   **`.env`**: Arquivo de configuração para todas as variáveis de ambiente (credenciais, modo de operação, etc.).
+-   **`config.example.json`**: Arquivo de exemplo para configurações adicionais da estratégia e do backtest.
 
-- **Modularity**: The code is divided into independent modules for data handling, strategy, execution, and risk management.
-- **Backtesting**: Allows for strategy testing with historical data, including simulation of transaction costs and slippage.
-- **Live Trading**: Can connect to a MetaTrader 5 account to operate in real-time.
-- **Risk Management**: Implements FTMO-style rules, such as maximum daily loss and maximum total loss.
-- **Security**: Uses `.env` files for managing sensitive information, avoiding hardcoded keys in the code.
+## Instruções de Uso
 
-## 3. Installation and Environment Setup
+### 1. Configuração do Ambiente
 
-### Prerequisites
+a. **Clone o Repositório:**
+   ```bash
+   git clone <URL_DO_REPOSITORIO>
+   cd <NOME_DO_REPOSITORIO>
+   ```
 
-- Python 3.10+
-- MetaTrader 5 Terminal (for live trading)
+b. **Crie o Ambiente Virtual e Instale as Dependências:**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # No Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-### Steps
+c. **Configure as Variáveis de Ambiente:**
+   - Crie uma cópia do arquivo `.env.example` e renomeie para `.env`.
+   - Preencha o `.env` com suas configurações. As variáveis principais são:
+     ```env
+     # --- Modo de Operação ---
+     LIVE_MODE=False               # Defina como 'True' para execução real/paper trading
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd Next-to-me
-    ```
+     # --- Configurações da Estratégia e Risco ---
+     RISK_PERCENT=0.02             # Risco por trade (ex: 0.02 para 2%)
+     SYMBOL=EURUSD                 # Símbolo do instrumento
+     TIMEFRAME=15m                 # Timeframe para análise
 
-2.  **Create a virtual environment:**
-    ```bash
-    python -m venv .venv
-    ```
-    - **Windows:**
-      ```bash
-      .venv\Scripts\activate
-      ```
-    - **Linux/macOS:**
-      ```bash
-      source .venv/bin/activate
-      ```
+     # --- Caminhos e Logs ---
+     LOG_DIR=logs                  # Diretório para salvar os arquivos de log
+     DATA_PATH=dummy_data.csv      # Caminho para o arquivo CSV com dados históricos para backtest
 
-3.  **Install the dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+     # --- Credenciais (para Modo Live) ---
+     API_KEY=
+     API_SECRET=
+     ```
 
-4.  **Configure environment variables:**
-    - Create a copy of `config.example.json` and rename it to `config.json`.
-    - Create a `.env` file for sensitive data (e.g., account credentials).
-    - An example `.env.example` file will be provided to show which variables are needed.
+### 2. Executando em Modo Backtest
 
-## 4. How to Use
+O modo backtest simula a estratégia com base em dados históricos de um arquivo CSV.
 
-The bot is executed from the command line through `main.py`.
+a. **Prepare seus Dados:**
+   - Garanta que o arquivo CSV definido em `DATA_PATH` (no `.env`) exista.
+   - O arquivo deve conter pelo menos uma coluna `timestamp` e uma coluna `close`.
 
-### Parameters
+b. **Execute o Backtest:**
+   - Certifique-se de que `LIVE_MODE` em seu `.env` está definido como `False`.
+   - Rode o bot a partir do seu terminal:
+     ```bash
+     python main.py
+     ```
+   - Ao final da execução, um arquivo `backtest_results.csv` será gerado na raiz do projeto com os detalhes de cada operação simulada.
 
--   `--mode`: Execution mode.
-    -   `dryrun`: Runs a backtest with historical data.
-    -   `live`: Operates in real-time with a MetaTrader 5 account.
--   `--data`: Path to the CSV file with historical data (required for `dryrun` mode).
--   `--config`: Path to the JSON configuration file (e.g., `config.json`).
+### 3. Executando em Modo Live
 
-### Examples
+O modo `live` é projetado para operar em tempo real, mas a lógica de busca de dados contínua (via websocket ou polling) é um **esqueleto** e precisa ser implementada.
 
-#### Backtesting (`dryrun`)
+a. **Configure para Live:**
+   - No arquivo `.env`, mude `LIVE_MODE` para `True`.
+   - Preencha as credenciais de API (`API_KEY`, `API_SECRET`, etc.).
 
-To run a backtest using a historical data file named `eurusd_15m.csv`:
+b. **Execute o Robô:**
+   ```bash
+   python main.py
+   ```
+   - O bot iniciará no modo `live`, mas a lógica de loop contínuo em `run_live()` precisa ser desenvolvida para se conectar à sua fonte de dados em tempo real.
+
+## Testes
+
+Para validar a funcionalidade dos módulos, você pode executar os testes unitários com `pytest`:
+
 ```bash
-python main.py --mode dryrun --data path/to/eurusd_15m.csv --config config.json
+pytest
 ```
+**Nota:** A execução dos testes pode falhar em ambientes não-Windows devido à dependência `MetaTrader5`.
 
-#### Live Trading (`live`)
+## Próximos Passos (Desenvolvimento)
 
-To run the bot in live trading mode, connected to MetaTrader 5:
-```bash
-python main.py --mode live --config config.json
-```
-**Note:** Always test your strategies in a demo account before operating in a real account.
-
-## 5. Project Structure
-
--   `main.py`: Main orchestrator of the bot.
--   `data_handler.py`: Module for importing, cleaning, and processing data.
--   `strategy.py`: Contains the trading logic and signal generation.
--   `execution.py`: Handles the simulated or real execution of orders.
--   `risk_management.py`: Manages risk, stop-loss, take-profit, and position sizing.
--   `mt5_connector.py`: Connects to the MetaTrader 5 API.
--   `utils.py`: Utility functions (logs, calculations, etc.).
--   `config.json`: Configuration file for the bot's parameters.
--   `.env`: File for environment variables (not versioned).
--   `requirements.txt`: List of project dependencies.
--   `tests/`: Directory with automated tests.
+-   **Integrar `risk_management.py`**: A função `calculate_position_size` precisa ser chamada em `core/engine.py` para que o lote seja calculado dinamicamente.
+-   **Finalizar `run_live`**: Implementar a busca de dados em tempo real (ex: usando `ccxt`, `MetaTrader5`, ou outra API) dentro do loop `while` em `run_live()` em `main.py`.
+-   **Unificar Configurações**: Centralizar todas as configurações (atualmente divididas entre `.env` e `config.example.json`) em uma única fonte para maior clareza.
