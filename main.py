@@ -1,3 +1,28 @@
+# main.py
+import asyncio
+from utils import logger
+from config_loader import load_config
+from core.engine import get_data, execute_trade
+from signals.strategy import generate_signal
+from risk_management import calculate_position_size
+import pandas as pd
+
+async def run_live(config):
+    logger.info("Live mode starting.")
+    while True:
+        # A lógica de dados ao vivo ainda é um placeholder.
+        # Numa implementação real, a chamada `get_data` seria assíncrona (`await get_data(...)`)
+        # e usaria, por exemplo, aiohttp ou um cliente de websocket.
+        logger.info("Fetching live data (placeholder)...")
+        await asyncio.sleep(60) # Pausa assíncrona
+
+def run_backtest(config):
+    data = get_data(
+        symbol=config['symbol'],
+        timeframe=config['timeframe'],
+        live=False
+    )
+    if data.empty:
 # main.py (substitui o ficheiro)
 import os
 import json

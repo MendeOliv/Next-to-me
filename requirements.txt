@@ -6,3 +6,4 @@ pytest
 joblib
 aiohttp
 requests
+pydantic
