@@ -1,3 +1,51 @@
+import os
+import json
+from typing import Any, Dict
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DEFAULT_CONFIG_PATH = os.getenv("CONFIG_PATH", "config.example.json")
+
+
+def load_config(path: str = None) -> Dict[str, Any]:
+    """Carrega o config JSON e mescla com variáveis de ambiente.
+
+    Prioridade: environment vars > json file > defaults.
+    """
+    path = path or DEFAULT_CONFIG_PATH
+    config = {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        # fallback para um config mínimo
+        config = {
+            "mode": "backtest",
+            "instrument": os.getenv("SYMBOL", "EURUSD"),
+            "data": {"path": os.getenv("DATA_PATH", "dummy_data.csv")},
+            "initial_balance": float(os.getenv("INITIAL_BALANCE", 10000)),
+        }
+
+    # override com env vars mais comuns
+    if os.getenv("SYMBOL"):
+        config["instrument"] = os.getenv("SYMBOL")
+    if os.getenv("DATA_PATH"):
+        config.setdefault("data", {})["path"] = os.getenv("DATA_PATH")
+    if os.getenv("INITIAL_BALANCE"):
+        try:
+            config["initial_balance"] = float(os.getenv("INITIAL_BALANCE"))
+        except ValueError:
+            pass
+
+    return config
+
+
+def get_bool_env(name: str, default: bool = False) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return v.lower() in ("1", "true", "yes", "y")
 # config_loader.py
 import os
 import json
