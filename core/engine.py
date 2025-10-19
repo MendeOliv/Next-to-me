@@ -1,5 +1,6 @@
 # core/engine.py
 import os
+import asyncio
 import pandas as pd
 from utils import logger
 from mt5_connector import MT5Connector
@@ -33,10 +34,14 @@ def get_data(symbol, timeframe, start=None, end=None, live=False):
 def simulate_trade(signal, balance, config, strategy_config, current_price):
     """Executa uma simulação de trade usando a lógica de SimulatedExecution."""
     exec_params = config['execution']
+    # Normalização: pip_size = incremento de preço por pip (ex.: 0.0001),
+    # pip_value = valor monetário por pip (ex.: 10.0 USD/pip)
+    pip_size = exec_params.get('pip_size', 0.0001)
+    pip_value = exec_params.get('pip_value', 10.0)
     sim_exec = SimulatedExecution(
         slippage_pips=exec_params['slippage_pips'],
         spread_pips=exec_params['spread_pips'],
-        pip_value=exec_params['pip_value']
+        pip_size=pip_size,
     )
 
     stop_loss_pips = strategy_config['stop_loss_pips']
@@ -48,17 +53,24 @@ def simulate_trade(signal, balance, config, strategy_config, current_price):
         side=signal,
         volume=size,
         price=current_price,
-        sl=current_price - stop_loss_pips * exec_params['pip_value'] if signal == 'buy' else current_price + stop_loss_pips * exec_params['pip_value']
+        sl=(
+            current_price - stop_loss_pips * pip_size
+            if signal == 'buy'
+            else current_price + stop_loss_pips * pip_size
+        )
     )
 
     # Simulação de saída (ex: take profit ou stop loss)
     exit_price = 0
     if signal == 'buy':
-        exit_price = trade_result['entry_price'] + strategy_config.get('take_profit_pips', 100) * exec_params['pip_value']
+        exit_price = trade_result['entry_price'] + strategy_config.get('take_profit_pips', 100) * pip_size
     else: # Sell
-        exit_price = trade_result['entry_price'] - strategy_config.get('take_profit_pips', 100) * exec_params['pip_value']
+        exit_price = trade_result['entry_price'] - strategy_config.get('take_profit_pips', 100) * pip_size
 
-    pnl = (exit_price - trade_result['entry_price']) * size * (1 / exec_params['pip_value']) if signal == 'buy' else (trade_result['entry_price'] - exit_price) * size * (1 / exec_params['pip_value'])
+    # Conversão de variação de preço -> pips -> monetário
+    price_diff = (exit_price - trade_result['entry_price']) if signal == 'buy' else (trade_result['entry_price'] - exit_price)
+    pips_moved = price_diff / pip_size
+    pnl = pips_moved * pip_value * size
     trade_result['pnl'] = pnl
     trade_result['balance_after'] = balance + pnl
 
@@ -67,19 +79,21 @@ def simulate_trade(signal, balance, config, strategy_config, current_price):
 def send_order(signal, balance, risk_config, strategy_config, current_price):
     """Envia uma ordem real usando o MT5Connector."""
     connector = MT5Connector() # Conecta usando variáveis de ambiente
-    connector.connect() # Garante que a conexão está ativa
+    connector.connect(live_mode=True) # Garante que a conexão está ativa em modo live
 
     stop_loss_pips = strategy_config['stop_loss_pips']
     size = calculate_position_size(balance, stop_loss_pips, risk_config['risk']['risk_per_trade_pct'])
 
-    sl = current_price - stop_loss_pips * risk_config['execution']['pip_value'] if signal == 'buy' else current_price + stop_loss_pips * risk_config['execution']['pip_value']
+    pip_size = risk_config['execution'].get('pip_size', 0.0001)
+    sl = current_price - stop_loss_pips * pip_size if signal == 'buy' else current_price + stop_loss_pips * pip_size
 
     return connector.place_order(
         instrument=risk_config['instrument'],
         side=signal,
         volume=size,
         price=current_price,
-        sl=sl
+        sl=sl,
+        live_mode=True,
     )
 
 def execute_trade(signal, balance, risk_config, strategy_config=None, current_price=None, live=False):
@@ -90,7 +104,7 @@ def execute_trade(signal, balance, risk_config, strategy_config=None, current_pr
     else:
         risk_conf = risk_config or {}
     # ensure execution defaults & instrument
-    risk_conf.setdefault('execution', {'pip_value': 10.0, 'slippage_pips': 1.0, 'spread_pips': 0.1})
+    risk_conf.setdefault('execution', {'pip_value': 10.0, 'pip_size': 0.0001, 'slippage_pips': 1.0, 'spread_pips': 0.1})
     risk_conf.setdefault('instrument', 'EURUSD')
     if strategy_config is None:
         strategy_config = {'stop_loss_pips': float(os.getenv('DEFAULT_STOP_LOSS_PIPS', 50))}

@@ -77,13 +77,35 @@ class MT5Connector:
 
         # Live mode: place an order using MetaTrader5
         if live_mode:
+            # respect DRY_RUN env to avoid accidental live orders
+            if os.environ.get("DRY_RUN", "False").lower() in ("1", "true", "yes", "y"):
+                logger.info("DRY_RUN is enabled; skipping real order placement and returning simulated response.")
+                return {
+                    "order_id": "dryrun-1",
+                    "instrument": instrument,
+                    "side": side,
+                    "volume": volume,
+                    "entry_price": price or 1.0,
+                    "status": "dryrun",
+                }
             if not self._mt5:
                 raise RuntimeError("MT5Connector: MetaTrader5 module not initialized")
 
             symbol = instrument
+            # ensure symbol is selected/visible
+            try:
+                if not self._mt5.symbol_select(symbol, True):
+                    logger.error(f"MT5Connector: failed to select symbol {symbol}")
+                    raise RuntimeError(f"symbol_select failed for {symbol}")
+            except Exception as e:
+                logger.error(f"MT5Connector: symbol_select error for {symbol}: {e}")
+                raise
             # build a market order request
             order_type = self._mt5.ORDER_TYPE_BUY if side.lower() == "buy" else self._mt5.ORDER_TYPE_SELL
-            price = price or (self._mt5.symbol_info_tick(symbol).ask if side.lower() == "buy" else self._mt5.symbol_info_tick(symbol).bid)
+            tick = self._mt5.symbol_info_tick(symbol)
+            if tick is None:
+                raise RuntimeError(f"MT5Connector: symbol_info_tick returned None for {symbol}")
+            price = price or (tick.ask if side.lower() == "buy" else tick.bid)
 
             request = {
                 "action": self._mt5.TRADE_ACTION_DEAL,

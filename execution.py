@@ -3,17 +3,17 @@ import time, random
 from utils import logger
 
 class SimulatedExecution:
-    def __init__(self, slippage_pips=1.0, spread_pips=0.1, pip_value=0.0001, latency_ms=0):
+    def __init__(self, slippage_pips=1.0, spread_pips=0.1, pip_size=0.0001, latency_ms=0):
         self.slippage_pips = slippage_pips
         self.spread_pips = spread_pips
-        self.pip_value = pip_value
+        self.pip_size = pip_size  # incremento de preço por pip
         self.latency_ms = latency_ms
 
     def place_order(self, instrument, side, volume, price=None, sl=None, tp=None):
         # simulate latency
         if self.latency_ms:
             time.sleep(self.latency_ms/1000.0)
-        adj = (self.slippage_pips + self.spread_pips) * self.pip_value
+        adj = (self.slippage_pips + self.spread_pips) * self.pip_size
         if side.lower() == 'buy':
             fill_price = price + adj
         else:

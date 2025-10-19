@@ -47,7 +47,8 @@ def calculate_position_size(balance, stop_loss_pips, risk_percent):
     else:
         rp_pct = rp
     try:
-        return round(position_size(float(balance), rp_pct, float(stop_loss_pips), float(os.environ.get("PIP_VALUE", 1.0))), 6)
+        # pip_value monetário por pip (ex.: 10.0)
+        return round(position_size(float(balance), rp_pct, float(stop_loss_pips), float(os.environ.get("PIP_VALUE", 10.0))), 6)
     except Exception as e:
         logger.error(f"calculate_position_size error: {e}")
         return 0

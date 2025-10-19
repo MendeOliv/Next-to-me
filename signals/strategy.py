@@ -10,8 +10,12 @@ def generate_signal(df):
     delta = df['close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    # Evita divisão por zero/NaNs
+    loss = loss.replace(0, float('nan'))
     rs = gain / loss
     df['rsi'] = 100 - (100 / (1 + rs))
+    if pd.isna(df['rsi'].iloc[-1]):
+        return None
 
     if df['rsi'].iloc[-1] > 70:
         return 'sell'

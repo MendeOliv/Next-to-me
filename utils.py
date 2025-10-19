@@ -4,28 +4,57 @@ from logging.handlers import RotatingFileHandler
 import os
 import json
 import subprocess
+import uuid
 from datetime import datetime
+
+RUN_ID = os.environ.get("RUN_ID") or uuid.uuid4().hex[:8]
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
 
 LOG_DIR = os.environ.get("LOG_DIR", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-def get_logger(name="next_to_me"):
+def get_logger(name: str = "next_to_me") -> logging.Logger:
     logger = logging.getLogger(name)
     if logger.handlers:
         return logger
-    logger.setLevel(logging.DEBUG)
+
+    level = getattr(logging, LOG_LEVEL.upper(), logging.INFO)
+    logger.setLevel(level)
+
     fh = RotatingFileHandler(os.path.join(LOG_DIR, f"{name}.log"), maxBytes=5_000_000, backupCount=5)
-    fh.setLevel(logging.DEBUG)
+    fh.setLevel(level)
     ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    ch.setLevel(level)
+
+    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(run_id)s | %(message)s")
+
+    class ContextFilter(logging.Filter):
+        def filter(self, record):
+            record.run_id = RUN_ID
+            return True
+
     fh.setFormatter(fmt)
     ch.setFormatter(fmt)
+    logger.addFilter(ContextFilter())
     logger.addHandler(fh)
     logger.addHandler(ch)
     return logger
 
-logger = get_logger()
+
+def get_run_logger(name: str = "next_to_me") -> logging.Logger:
+    """Helper que retorna um logger já configurado com run metadata.
+
+    Uso: logger = get_run_logger(__name__)
+    """
+    log = get_logger(name)
+    try:
+        gh = git_hash()
+    except Exception:
+        gh = "unknown"
+    log = logging.LoggerAdapter(log, {"git_hash": gh, "run_id": RUN_ID})
+    return log
+
+logger = get_run_logger()
 
 def save_trades_csv(trades, out_dir="runs"):
     os.makedirs(out_dir, exist_ok=True)
